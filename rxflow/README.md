@@ -1,4 +1,4 @@
-# RxFlow（npm 包名 `rx-flow`）
+# RxFlow（npm 包名 `@xcsweb/rx-flow`）
 
 RxJS 流调试控制台——**RxJS 之于 Redux DevTools**。
 
@@ -7,7 +7,7 @@ RxJS 流调试控制台——**RxJS 之于 Redux DevTools**。
 管道上下游怎么连的，一眼看清。不用再 console.log 满天飞。
 
 ```bash
-npm install rx-flow
+npm install @xcsweb/rx-flow
 # peer dep
 npm install rxjs
 ```
@@ -18,7 +18,7 @@ npm install rxjs
 
 ```js
 // main.js 入口
-import { RxFlow } from 'rx-flow';
+import { RxFlow } from '@xcsweb/rx-flow';
 RxFlow.autoTrack();
 ```
 
@@ -30,7 +30,7 @@ RxFlow.autoTrack();
 给关心的流起名字、声明上下游，面板会画出管道拓扑连线：
 
 ```js
-import { RxFlow } from 'rx-flow';
+import { RxFlow } from '@xcsweb/rx-flow';
 import { fromEvent, map, debounceTime, switchMap, catchError, of } from 'rxjs';
 
 const input = document.querySelector('#kw');
@@ -95,14 +95,14 @@ Vite 项目自动支持 ESM，无需额外配置。生产环境不想带调试�
 ```js
 // main.js
 if (import.meta.env.DEV) {
-  import('rx-flow').then(({ RxFlow }) => RxFlow.autoTrack());  // 动态 import，生产包会被 tree-shake 掉
+  import('@xcsweb/rx-flow').then(({ RxFlow }) => RxFlow.autoTrack());  // 动态 import，生产包会被 tree-shake 掉
 }
 ```
 
 或者让面板常驻但默认挂起：
 
 ```js
-import { RxFlow } from 'rx-flow';
+import { RxFlow } from '@xcsweb/rx-flow';
 RxFlow.autoTrack();
 if (import.meta.env.PROD) RxFlow.setPaused(true);   // 悬浮球在，需要时再打开记录
 ```

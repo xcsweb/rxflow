@@ -2,13 +2,13 @@
 
 把 RxJS 异步时序的黑箱变成可回放的因果链——**RxJS 之于 Redux DevTools**。
 
-npm 包 [`rx-flow`](https://www.npmjs.com/package/rx-flow)：任何用了 RxJS 的前端项目，入口 import 一次，右下角出现悬浮球，点开（或 `Ctrl+\``）就是一张实时流图——哪些流在发值、发了什么、错在哪一步、管道上下游怎么连的，一眼看清。
+npm 包 [`@xcsweb/rx-flow`](https://www.npmjs.com/package/@xcsweb/rx-flow)：任何用了 RxJS 的前端项目，入口 import 一次，右下角出现悬浮球，点开（或 `Ctrl+\``）就是一张实时流图——哪些流在发值、发了什么、错在哪一步、管道上下游怎么连的，一眼看清。
 
 ## 项目结构
 
 ```
 rxjs/
-├── rxflow/          📦 npm 包 rx-flow（浏览器调试面板，可发布）
+├── rxflow/          📦 npm 包 @xcsweb/rx-flow（浏览器调试面板，可发布）
 │   ├── src/             源码：零埋点 autoTrack / observe 埋点 / 面板 UI / Canvas 流图
 │   ├── demo/            演示页（拓扑连线、错误路径、JSON 检查器、单步模式）
 │   ├── test/            Node 测试（node --test，22 个用例）
@@ -27,11 +27,11 @@ rxjs/
 ### 浏览器调试面板（npm 包）
 
 ```bash
-npm install rx-flow rxjs
+npm install @xcsweb/rx-flow rxjs
 ```
 
 ```js
-import { RxFlow } from 'rx-flow';
+import { RxFlow } from '@xcsweb/rx-flow';
 RxFlow.autoTrack();          // 零埋点：所有顶层订阅的流自动出现在面板
 ```
 

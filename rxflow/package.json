@@ -1,5 +1,5 @@
 {
-  "name": "rx-flow",
+  "name": "@xcsweb/rx-flow",
   "version": "0.2.0",
   "description": "RxJS 流调试控制台：import 一次，右下角悬浮球点开看 Observable 数据流的实时动画、中途值、错误与管道拓扑。RxJS 之于 Redux DevTools。",
   "type": "module",
@@ -36,7 +36,7 @@
     "vconsole",
     "time-travel"
   ],
-  "author": "rxflow",
+  "author": "xcsweb",
   "license": "MIT",
   "engines": {
     "node": ">=14"
@@ -46,5 +46,8 @@
   },
   "devDependencies": {
     "rxjs": "^7.8.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,7 +1,7 @@
 // index.js —— RxFlow 入口
 //
 // 最简接入（零埋点）：入口文件两行，页面所有顶层订阅的流自动出现在面板
-//   import { RxFlow } from 'rxflow';
+//   import { RxFlow } from '@xcsweb/rx-flow';
 //   RxFlow.autoTrack();
 //
 // 推荐接入（命名关键流，可画管道拓扑）：
