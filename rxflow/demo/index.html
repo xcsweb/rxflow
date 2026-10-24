@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxFlow Demo · RxJS 流调试控制台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: #f5f6f8; color: #1c2333; padding: 32px 20px; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .tip {
+    background: #0f1115; color: #cdd6e4; border: 1px solid #262d3b; border-radius: 10px;
+    padding: 14px 18px; font-size: 12.5px; line-height: 1.7; margin-bottom: 20px;
+  }
+  .tip b { color: #4da3ff; }
+  .tip kbd { background: #1c212c; border: 1px solid #3a4356; border-radius: 4px; padding: 0 6px; font: 11px monospace; color: #e8ecf3; }
+  .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); margin-bottom: 20px; }
+  h2 { font-size: 16px; margin-bottom: 6px; }
+  .sub { font-size: 12px; color: #8a94a6; margin-bottom: 14px; }
+  input[type=text] {
+    width: 100%; padding: 11px 14px; border: 1px solid #d0d5dd; border-radius: 8px;
+    font-size: 14px; outline: none;
+  }
+  input[type=text]:focus { border-color: #4da3ff; }
+  .chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .chip {
+    padding: 6px 14px; border-radius: 999px; border: 1px solid #d0d5dd;
+    font-size: 12.5px; cursor: pointer; background: #fff; user-select: none;
+  }
+  .chip:hover { border-color: #4da3ff; }
+  .chip.on { background: #0f1115; color: #fff; border-color: #0f1115; }
+  .list { margin-top: 16px; min-height: 60px; }
+  .list .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; border-bottom: 1px solid #f0f2f5; font-size: 13px; cursor: pointer;
+  }
+  .list .row:hover { background: #f7faff; }
+  .list .row em { color: #8a94a6; font-style: normal; font-size: 12px; }
+  .list .empty { color: #b3bac7; font-size: 12.5px; padding: 14px 4px; }
+  .errbox {
+    margin-top: 14px; background: #fdf1f0; border: 1px solid #f3c2be; color: #b3261e;
+    padding: 10px 14px; border-radius: 8px; font-size: 12.5px;
+  }
+  .cart { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .cart .n { color: #3dd68c; font: 700 15px monospace; }
+  .burst {
+    margin-top: 12px; padding: 6px 12px; border-radius: 8px; border: 1px dashed #b3bac7;
+    background: #fff; font-size: 12px; color: #5b6475; cursor: pointer;
+  }
+  .burst:hover { border-color: #4da3ff; color: #4da3ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tip">
+    <b>RxFlow 调试演示页</b> —— 看右下角的 "Rx" 悬浮球，点它或按 <kbd>Ctrl+`</kbd> 打开调试面板。<br>
+    页面里有 3 条命名流（<b>keyword$</b>、<b>priceRange$</b> → 双上游汇入 <b>query$</b>，面板会画连线），
+    以及 autoTrack 自动捕获的流（购物车 Subject、2 秒心跳）。试试：
+    ① 输入框打字，看数据包沿连线流动；② 输入 <b>error</b> 触发请求失败，看面板错误高亮（流会自动恢复）；
+    ③ 点击搜索结果加入购物车；④ 点日志里的值展开 JSON 检查器；⑤ 试试 <b>暂停</b> 记录。
+  </div>
+
+  <div class="card">
+    <h2>商品搜索</h2>
+    <div class="sub">流：input → keyword$（防抖 300ms）→ combineLatest(priceRange$) → query$（模拟请求 200~600ms）</div>
+    <input id="kw" type="text" placeholder="搜索商品…（输入 error 试试错误路径）" autocomplete="off">
+    <div class="chips" id="chips">
+      <span class="chip on" data-min="0" data-max="0">全部价格</span>
+      <span class="chip" data-min="0" data-max="1000">0 ~ 1000</span>
+      <span class="chip" data-min="1000" data-max="5000">1000 ~ 5000</span>
+      <span class="chip" data-min="5000" data-max="0">5000 +</span>
+    </div>
+    <button id="burst" class="burst">⚡ 模拟高频流（80ms × 30 条）— 配合面板「速度滑杆 / 单步」观察</button>
+    <div class="list" id="list"><div class="empty">正在加载推荐…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>购物车（Subject 流，autoTrack 自动捕获）</h2>
+    <div class="sub">点击上面的搜索结果推入购物车 → cart 流发值，面板自动出现对应的 Subject 节点</div>
+    <div class="cart">已加入 <span class="n" id="cartN">0</span> 件</div>
+    <div class="list" id="cartList"><div class="empty">购物车是空的</div></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "rxjs": "https://cdn.jsdelivr.net/npm/rxjs@7.8.1/+esm"
+  }
+}
+</script>
+<script type="module">
+  import { fromEvent, map, debounceTime, switchMap, combineLatest, interval, Subject, startWith, take } from 'rxjs';
+  import RxFlow from '../src/index.js';
+
+  // ===== 1. 打开零埋点自动跟踪（要在业务订阅之前调用） =====
+  RxFlow.autoTrack();
+
+  // ===== 2. 命名关键流 =====
+  const input = document.getElementById('kw');
+  const keyword$ = RxFlow.observe(
+    fromEvent(input, 'input').pipe(
+      map(e => e.target.value.trim()),
+      debounceTime(300),
+      startWith(''),                 // 初始发一个空值，combineLatest 立即可用
+    ),
+    'keyword$'
+  );
+
+  const chips = document.getElementById('chips');
+  const priceRange$ = RxFlow.observe(
+    fromEvent(chips, 'click').pipe(
+      map(e => ({ min: Number(e.target.dataset.min), max: Number(e.target.dataset.max) })),
+      startWith({ min: 0, max: 0 }),
+    ),
+    'priceRange$'
+  );
+  // chip 高亮是纯 UI 逻辑，不进流
+  chips.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('chip')) return;
+    chips.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    e.target.classList.add('on');
+  });
+
+  // ===== 3. 双上游汇合：keyword$ 与 priceRange$ → query$ =====
+  const query$ = RxFlow.observe(
+    combineLatest([keyword$, priceRange$]).pipe(
+      switchMap(([kw, range]) => mockSearch(kw, range)),
+    ),
+    'query$'
+  );
+  // 多父连线用 recorder.edge 声明（observe 的 { from } 只支持单父）
+  RxFlow.recorder.edge('keyword$', 'query$');
+  RxFlow.recorder.edge('priceRange$', 'query$');
+
+  const list = document.getElementById('list');
+  function renderList(html) { list.innerHTML = html; }
+
+  // 错误后流会终止（RxJS 语义），演示页用「错误处理 + 重订阅」保持可玩：
+  // 面板上能看到 ✕ 错误事件，页面自动恢复。
+  function connectQuery() {
+    query$.subscribe({
+      next: (res) => {
+        if (!res.items.length) { renderList('<div class="empty">没有匹配的商品</div>'); return; }
+        renderList(res.items.map(i =>
+          `<div class="row" data-name="${i.name}" data-price="${i.price}">
+             <span>${i.name}</span><em>¥${i.price} · 点击加入购物车</em>
+           </div>`).join(''));
+      },
+      error: (err) => {
+        renderList(`<div class="errbox">请求失败：${err.message}<br><span style="color:#8a94a6">已自动重试，调试面板里可以看到这条 ✕ 错误</span></div>`);
+        setTimeout(connectQuery, 500);
+      },
+    });
+  }
+  connectQuery();
+
+  function mockSearch(kw, range) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (kw.toLowerCase() === 'error') { reject(new Error('504 Gateway Timeout（演示错误路径）')); return; }
+        const base = kw || '推荐';
+        const items = [
+          { name: base + ' · 青春版', price: 899 },
+          { name: base + ' · 标准版', price: 1299 },
+          { name: base + ' · Pro 版', price: 1999 },
+        ].filter(i => i.price >= range.min && (range.max === 0 || i.price < range.max));
+        resolve({ kw, range, items });
+      }, 200 + Math.random() * 400);
+    });
+  }
+
+  // ===== 4. 购物车：Subject 流，不 observe，让 autoTrack 捕获 =====
+  const cart$ = new Subject();
+  cart$.subscribe(item => {
+    const n = document.getElementById('cartN');
+    n.textContent = String(Number(n.textContent) + 1);
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<span>${item.name}</span><em>¥${item.price}</em>`;
+    document.getElementById('cartList').prepend(row);
+  });
+
+  list.addEventListener('click', (e) => {
+    const row = e.target.closest('.row');
+    if (!row) return;
+    cart$.next({ name: row.dataset.name, price: Number(row.dataset.price), ts: Date.now() });
+  });
+
+  // ===== 5. 心跳：普通 Observable，autoTrack 自动捕获 =====
+  interval(2000).pipe(map(i => ({ tick: i, alive: true }))).subscribe(() => {});
+
+  // ===== 6. 高频流：复现「刷太快看不清」→ 用面板的速度滑杆 / 单步逐条看 =====
+  document.getElementById('burst').addEventListener('click', () => {
+    interval(80).pipe(
+      take(30),
+      map(i => ({ i, price: 1000 + Math.round(Math.random() * 900) })),
+    ).subscribe(() => {});
+  });
+</script>
+</body>
+</html>

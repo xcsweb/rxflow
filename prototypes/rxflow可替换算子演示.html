@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxFlow · 可替换算子演示</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1d24'/%3E%3Cpath d='M7 9l9 9-9 9' stroke='%23e8594f' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 9h9' stroke='%234da3ff' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0d0f14;--panel:#151922;--panel2:#1b2130;--line:#262e40;
+    --ink:#e9edf5;--muted:#94a0b5;--dim:#5d687c;
+    --accent:#4da3ff;--accent2:#3dd68c;--warn:#f2b04a;--bad:#e8594f;--vio:#9b7cf2;
+    --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  header h1{font-size:19px;font-weight:800}
+  header .tag{font-family:var(--mono);font-size:11px;color:var(--accent);border:1px solid rgba(77,163,255,.3);background:rgba(77,163,255,.08);padding:3px 10px;border-radius:20px}
+  .desc{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .desc b{color:var(--ink)}
+  .ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .ctl button{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .ctl button:hover{border-color:var(--accent)}
+  .ctl button.on{background:var(--accent);border-color:var(--accent);color:#081018;font-weight:600}
+  .ctl .lbl{font-size:12px;color:var(--dim);margin-left:6px}
+  .status{font-family:var(--mono);font-size:11px;color:var(--accent2);margin-left:auto}
+
+  .flow-frame{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:18px}
+  canvas{display:block;width:100%}
+  .flow-foot{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);flex-wrap:wrap}
+  .flow-foot .hint{font-family:var(--mono);font-size:11px;color:var(--accent)}
+
+  .hint-bar{background:rgba(77,163,255,.07);border:1px solid rgba(77,163,255,.2);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--muted);margin-bottom:18px}
+  .hint-bar b{color:var(--accent)}
+
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+  .cmp-col{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cmp-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+  .cmp-head .op{font-family:var(--mono);color:var(--accent)}
+  .cmp-head .cnt{font-size:11px;color:var(--dim);font-family:var(--mono);margin-left:auto}
+  .cmp-head.new{background:rgba(61,214,140,.06)}
+  .cmp-head.new .op{color:var(--accent2)}
+  .cmp-body{max-height:300px;overflow:auto;padding:6px 0}
+  .vrow{display:flex;align-items:center;gap:10px;padding:5px 16px;font-size:12.5px;border-left:3px solid transparent}
+  .vrow.drop{opacity:.45;border-left-color:var(--bad)}
+  .vrow.pass{border-left-color:var(--accent2)}
+  .vrow .tm{font-family:var(--mono);font-size:11px;color:var(--dim);width:64px;flex:none}
+  .vrow .val{font-family:var(--mono);color:#cfe4ff}
+  .vrow .tag{font-size:10px;margin-left:auto;padding:1px 7px;border-radius:9px}
+  .vrow.drop .tag{color:var(--bad);background:rgba(232,89,79,.12)}
+  .vrow.pass .tag{color:var(--accent2);background:rgba(61,214,140,.12)}
+  .cmp-empty{padding:26px;text-align:center;color:var(--dim);font-size:13px}
+
+  .op-list{position:fixed;background:#11151d;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:8px;min-width:220px;z-index:100}
+  .op-list .t{font-size:11px;color:var(--dim);padding:6px 10px;font-family:var(--mono)}
+  .op-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+  .op-item:hover{background:rgba(77,163,255,.1)}
+  .op-item .nm{font-family:var(--mono);color:var(--accent);font-size:12.5px}
+  .op-item .ds{color:var(--dim);font-size:11px;margin-left:auto}
+  .op-item.cur{background:rgba(61,214,140,.1)}
+  .op-item.cur .nm{color:var(--accent2)}
+  .op-item .badge{font-size:10px;background:rgba(61,214,140,.15);color:var(--accent2);padding:1px 6px;border-radius:8px;margin-left:6px}
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:rgba(61,214,140,.15);border:1px solid rgba(61,214,140,.4);color:var(--accent2);padding:10px 20px;border-radius:10px;font-size:13px;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+
+  @media (max-width:720px){ .compare{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>RxFlow · 可替换算子</h1>
+    <span class="tag">交互演示</span>
+    <span class="status" id="status">运行中</span>
+  </header>
+  <p class="desc">不用改代码，在面板里点算子就能<b>换一个试试</b>。面板用<b>已录的真实输入</b>重跑新算子，立刻对比新旧输出——这是「可替换」的核心：<code style="font-family:monospace">看，还能改</code>。</p>
+
+  <div class="ctl">
+    <button id="ctlRun" class="on">⏸ 暂停</button>
+    <button id="ctlReset">重置</button>
+    <button id="ctlFeed">喂一个输入</button>
+    <button id="ctlSpeed">速度 ×1</button>
+    <span class="lbl">点击图中带「可换」标记的算子（debounce / switchMap）弹出候选</span>
+  </div>
+
+  <div class="flow-frame">
+    <canvas id="flow"></canvas>
+    <div class="flow-foot">
+      <span class="hint">● 源自动发射</span>
+      <span>· 数据包沿流流动</span>
+      <span>· 红色 = 被算子丢弃</span>
+      <span id="recInfo" style="margin-left:auto;font-family:monospace;font-size:11px"></span>
+    </div>
+  </div>
+
+  <div class="hint-bar" id="demoHint">
+    默认：<b>debounceTime(300)</b> 之后是 <b>distinctUntilChanged</b>，再到 <b>switchMap(fetch)</b>。
+    <br>试试：点 <b>debounce</b> 换成 <b>throttleTime</b>，或点 <b>switchMap</b> 换成 <b>exhaustMap / mergeMap</b>，看下面新旧输出并排对比——不动代码，改了立刻知道效果。
+  </div>
+
+  <div class="compare">
+    <div class="cmp-col">
+      <div class="cmp-head"><span class="op" id="cmpOldOp">debounceTime(300)</span><span class="cnt" id="cmpOldCnt"></span></div>
+      <div class="cmp-body" id="cmpOldBody"></div>
+    </div>
+    <div class="cmp-col">
+      <div class="cmp-head new"><span class="op" id="cmpNewOp">（未替换）</span><span class="cnt" id="cmpNewCnt"></span></div>
+      <div class="cmp-body" id="cmpNewBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="op-list" id="opList" style="display:none"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   RxFlow · 可替换算子演示
+   核心机制：
+   1. 源发射值，数据包流经 debounce → distinct → switchMap → map → render
+   2. 每个算子节点录制收到的输入序列（时间戳+值）
+   3. 点可替换算子（debounce/switchMap）→ 弹出候选
+   4. 选中候选 → 用已录输入重跑新算子模拟器 → 并排对比新旧输出
+   纯原生 Canvas + JS，无依赖。
+   ========================================================= */
+const $=id=>document.getElementById(id);
+const cv=$('flow'),cx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+
+/* ---- 流拓扑：5 节点 ---- */
+const SPEC=[
+  {id:'src',op:'source$',color:'#4da3ff',label:'用户输入',replaceable:false},
+  {id:'deb',op:'debounceTime(300)',color:'#f2b04a',label:'可替换 · 防抖',replaceable:true,kind:'debounce'},
+  {id:'dist',op:'distinctUntilChanged',color:'#9b7cf2',label:'去重',replaceable:false},
+  {id:'sw',op:'switchMap(fetch)',color:'#4da3ff',label:'可替换 · 取最新',replaceable:true,kind:'switch'},
+  {id:'out',op:'render()',color:'#3dd68c',label:'渲染',replaceable:false},
+];
+/* 候选算子（同 kind 可互相替换） */
+const OPS={
+  debounce:{cur:'debounceTime(300)',list:[
+    {nm:'debounceTime(300)',ds:'停 300ms 取末',impl:'debounce'},
+    {nm:'throttleTime(250)',ds:'250ms 只发首',impl:'throttle'},
+    {nm:'auditTime(300)',ds:'周期取末',impl:'audit'},
+    {nm:'sampleTime(250)',ds:'定时采样',impl:'sample'},
+  ]},
+  switch:{cur:'switchMap(fetch)',list:[
+    {nm:'switchMap(fetch)',ds:'取最新,取消旧',impl:'switch'},
+    {nm:'exhaustMap(fetch)',ds:'忙时忽略新',impl:'exhaust'},
+    {nm:'mergeMap(fetch)',ds:'全并发',impl:'merge'},
+    {nm:'concatMap(fetch)',ds:'排队串行',impl:'concat'},
+  ]},
+};
+let curOps={debounce:'debounceTime(300)',switch:'switchMap(fetch)'};
+
+/* ---- 节点/边布局 ---- */
+let nodes=[],edges=[];
+function layout(){
+  const gap=56,pad=20;
+  const totalW=SPEC.length*130+(SPEC.length-1)*gap;
+  const x0=Math.max(10,(W-totalW)/2);
+  nodes=SPEC.map((s,i)=>({...s,x:x0+i*(130+gap),y:H/2-30,w:130,h:60}));
+  edges=[];for(let i=0;i<nodes.length-1;i++)edges.push({from:nodes[i].id,to:nodes[i+1].id});
+}
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  DPR=Math.min(devicePixelRatio||1,2);
+  W=r.width;H=200;
+  cv.width=Math.floor(W*DPR);cv.height=Math.floor(H*DPR);
+  cv.style.width=W+'px';cv.style.height=H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+
+/* ---- 运行时 ---- */
+let running=true,playing=true,raf=null,lastTs=0,clock=0,pid=0;
+let packets=[];                 // 在途数据包
+let rec=[];                     // 录制事件 {t,node,value,stage,drop}
+let inputSeq={};                // 每个算子的输入序列（用于重跑） {nodeId:[{t,value}]}
+const KW=['苹','苹果','苹果手','苹果手机','苹果手','苹果','苹','苹手'];
+let ki=0,feedTimer=0,feedInterval=1500;
+let burstLeft=0,burstTimer=0,burstInterval=140;
+let speed=1;
+
+function nodeById(id){return nodes.find(n=>n.id===id);}
+function recIn(nodeId,value,drop){
+  const ev={t:clock,node:nodeId,value,stage:drop?'drop':'in',drop:!!drop};
+  rec.push(ev);
+  if(!inputSeq[nodeId])inputSeq[nodeId]=[];
+  inputSeq[nodeId].push({t:clock,value});
+}
+function recOut(nodeId,value){rec.push({t:clock,node:nodeId,value,stage:'out',drop:false});}
+function fmt(ms){const s=ms/1000;const m=Math.floor(s/60);return (m<10?'0':'')+m+':'+(s%60).toFixed(1).padStart(4,'0');}
+
+/* 源发射逻辑：模拟"打字"——一个周期内连发几个密集值（间隔 ~140ms），然后停顿 */
+function emitSource(){
+  const v=KW[ki++%KW.length];
+  recIn('deb',v,false);
+  packets.push({id:++pid,edge:'src→deb',progress:0,value:v,color:'#4da3ff',dead:false,held:false,hold:0,nextEdge:null});
+}
+
+/* 推进包（简化但保留防抖/switchMap 延迟语义） */
+function advance(dt){
+  for(const p of packets){
+    if(p.dead)continue;
+    if(p.held){
+      p.hold-=dt;
+      if(p.hold<=0){
+        if(p.nextEdge){p.edge=p.nextEdge;p.progress=0;}
+        p.held=false;p.nextEdge=null;
+      }
+      continue;
+    }
+    const e=edges.find(x=>x.from+'→'+x.to===p.edge);
+    if(!e){p.dead=true;continue;}
+    const from=nodeById(e.from),to=nodeById(e.to);
+    const len=Math.max(1,Math.abs(to.x-from.x));
+    p.progress+=dt*(0.08+0.04*speed)*60;
+    if(p.progress>=len){
+      if(!to){p.dead=true;continue;}
+      // 到达节点：应用该算子的实时模拟（只决定"通过/丢弃/延迟"，值在 out 时才 recOut）
+      if(to.id==='deb'||to.id==='dist'||to.id==='sw'){
+        const res=applyOpLive(to.id,p.value);
+        recOut(to.id,p.value);
+        if(!res.pass){p.dead=true;continue;} // 丢弃
+        const delay=res.delay||0;
+        if(delay>0){p.held=true;p.hold=delay;}
+        const nextE=edges.find(x=>x.from===to.id);
+        if(nextE){p.nextEdge=nextE.from+'→'+nextE.to;}
+        if(delay<=0){p.edge=nextE.from+'→'+nextE.to;p.progress=0;}
+      } else if(to.id==='out'){
+        recOut('out',p.value);
+        p.dead=true;
+      } else {
+        const nextE=edges.find(x=>x.from===to.id);
+        if(nextE){p.edge=nextE.from+'→'+nextE.to;p.progress=0;}
+        else p.dead=true;
+      }
+    }
+  }
+  packets=packets.filter(p=>!p.dead);
+}
+
+/* 实时算子状态（简化实现，供演示视觉） */
+let opState={};
+function applyOpLive(nodeId,value){
+  // 返回 {pass:boolean, delay:number}
+  if(nodeId==='dist'){
+    if(opState.lastDist===value)return {pass:false};
+    opState.lastDist=value;return {pass:true};
+  }
+  if(nodeId==='deb'){
+    const kind=curOps.debounce;
+    if(kind==='debounceTime(300)'){ return {pass:true,delay:300}; }
+    if(kind==='throttleTime(250)'){ const now=clock; if(opState.thT!==undefined&&now-opState.thT<250)return {pass:false}; opState.thT=now; return {pass:true}; }
+    if(kind==='auditTime(300)'){ return {pass:true,delay:300}; }
+    if(kind==='sampleTime(250)'){ return {pass:true,delay:250}; }
+  }
+  if(nodeId==='sw'){
+    const kind=curOps.switch;
+    if(kind==='switchMap(fetch)'){ return {pass:true,delay:320}; }
+    if(kind==='exhaustMap(fetch)'){ if(opState.busy)return {pass:false}; opState.busy=true;setTimeout(()=>opState.busy=false,320); return {pass:true,delay:320}; }
+    if(kind==='mergeMap(fetch)'){ return {pass:true,delay:180}; }
+    if(kind==='concatMap(fetch)'){ return {pass:true,delay:260}; }
+  }
+  return {pass:true};
+}
+
+function loop(ts){
+  if(!lastTs)lastTs=ts;
+  const dt=Math.min(60,ts-lastTs);lastTs=ts;
+  if(running&&playing){
+    clock+=dt;
+    feedTimer-=dt;
+    if(burstLeft>0){
+      burstTimer-=dt;
+      if(burstTimer<=0){burstTimer=burstInterval/speed;burstLeft--;emitSource();}
+    } else if(feedTimer<=0){
+      feedTimer=1100/speed;    // 停顿
+      burstLeft=3;             // 新一段"打字"
+      burstTimer=0;
+    }
+    advance(dt);
+  }
+  draw();
+  updateUI();
+  raf=requestAnimationFrame(loop);
+}
+
+/* ---- 绘制 ---- */
+function draw(){
+  cx.clearRect(0,0,W,H);
+  // 网格
+  cx.strokeStyle='rgba(38,46,64,.35)';cx.lineWidth=1;const gs=24;
+  for(let x=gs*.5;x<W;x+=gs){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+  for(let y=gs*.5;y<H;y+=gs){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+  // 边
+  for(const e of edges){
+    const a=nodeById(e.from),b=nodeById(e.to);
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2,mx=(x1+x2)/2;
+    cx.strokeStyle='rgba(255,255,255,.09)';cx.lineWidth=1.5;
+    cx.beginPath();cx.moveTo(x1,y1);cx.bezierCurveTo(mx,y1,mx,y2,x2,y2);cx.stroke();
+  }
+  // 包
+  for(const p of packets){
+    if(p.dead)continue;
+    const e=edges.find(x=>x.from+'→'+x.to===p.edge);
+    if(!e)continue;
+    const a=nodeById(e.from),b=nodeById(e.to);
+    const len=Math.max(1,Math.abs(b.x-a.x)),t=Math.min(1,p.progress/len);
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2,mx=(x1+x2)/2;
+    const px=(1-t)*(1-t)*x1+2*(1-t)*t*mx+t*t*x2;
+    const py=(1-t)*(1-t)*y1+2*(1-t)*t*((y1+y2)/2)+t*t*y2;
+    cx.fillStyle='#10141b';cx.strokeStyle='#3b4659';cx.lineWidth=1.2;
+    const bw=Math.max(26,Math.min(60,8+String(p.value).length*6)),bh=17;
+    rrect(px-bw/2,py-bh/2,bw,bh,4);cx.fill();cx.stroke();
+    cx.fillStyle='#cfe4ff';cx.font='9.5px monospace';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(p.value,px,py+.5);
+  }
+  // 节点
+  for(const n of nodes){
+    const isRep=n.replaceable;
+    cx.fillStyle=isRep?'#1a202b':'#181d27';
+    cx.strokeStyle=isRep?'rgba(242,176,74,.7)':n.color;
+    cx.lineWidth=isRep?1.8:1.5;
+    rrect(n.x,n.y,n.w,n.h,9);cx.fill();cx.stroke();
+    // 可换标记角标
+    if(isRep){
+      cx.fillStyle='rgba(242,176,74,.15)';
+      cx.beginPath();cx.moveTo(n.x+n.w,n.y+n.h-14);cx.lineTo(n.x+n.w,n.y+n.h);cx.lineTo(n.x+n.w-14,n.y+n.h);cx.closePath();cx.fill();
+      cx.fillStyle='#f2b04a';cx.font='9px monospace';cx.textAlign='right';cx.textBaseline='bottom';
+      cx.fillText('换',n.x+n.w-4,n.y+n.h-3);
+    }
+    cx.fillStyle='#f0f3fa';cx.font='600 11.5px sans-serif';cx.textAlign='left';cx.textBaseline='middle';
+    cx.fillText(n.op,n.x+12,n.y+22);
+    cx.fillStyle='#6b7486';cx.font='9.5px sans-serif';
+    cx.fillText(n.label,n.x+12,n.y+40);
+    // 计数徽标
+    const cnt=countFor(n.id);
+    if(cnt>0){
+      const txt=String(cnt),wpx=9+txt.length*6;
+      cx.fillStyle=n.color;cx.beginPath();cx.arc(n.x+n.w-12,n.y+12,wpx/2,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#081018';cx.font='bold 9px monospace';cx.textAlign='center';cx.textBaseline='middle';
+      cx.fillText(txt,n.x+n.w-12,n.y+12.5);
+    }
+  }
+}
+function rrect(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath();}
+function countFor(id){return rec.filter(e=>e.node===id&&e.stage==='out').length;}
+
+/* ---- 交互：点节点弹候选 ---- */
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  const n=nodes.find(n=>n.replaceable&&x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h);
+  if(!n){closeOpList();return;}
+  showOpList(n,e.clientX,e.clientY);
+});
+function showOpList(n,mx,my){
+  const kind=n.kind,list=OPS[kind].list,cur=curOps[kind==='debounce'?'debounce':'switch'];
+  const el=$('opList');
+  el.innerHTML='<div class="t">替换 '+n.id+' · '+kind+'</div>'+
+    list.map(o=>'<div class="op-item'+(o.nm===cur?' cur':'')+'" data-nm="'+o.nm+'" data-kind="'+kind+'" data-impl="'+o.impl+'"><span class="nm">'+o.nm+'</span><span class="ds">'+o.ds+'</span></div>').join('');
+  el.style.display='block';
+  el.style.left=Math.min(mx,window.innerWidth-240)+'px';
+  el.style.top=Math.min(my,window.innerHeight-260)+'px';
+  // 绑定
+  el.querySelectorAll('.op-item').forEach(btn=>{
+    btn.addEventListener('click',ev=>{
+      ev.stopPropagation();
+      const kind=btn.dataset.kind,nm=btn.dataset.nm;
+      if(curOps[kind]===nm){closeOpList();return;}
+      curOps[kind]=nm;
+      applyReplace(kind,nm);
+      closeOpList();
+    });
+  });
+}
+function closeOpList(){$('opList').style.display='none';}
+document.addEventListener('click',e=>{if(!e.target.closest('.op-item')&&!e.target.closest('canvas'))closeOpList();});
+
+/* ---- 替换核心：用已录输入重跑新算子 ---- */
+let replaced=null; // {kind, nodeId, oldOp, newOp, oldSeq, newSeq}
+function applyReplace(kind,nm){
+  const nodeId=kind==='debounce'?'deb':'sw';
+  const oldOp=OPS[kind].cur;
+  OPS[kind].cur=nm;
+  const oldSeq=countFor(nodeId);
+  // 用该算子的已录输入序列，重跑新算子模拟器
+  const ins=inputSeq[nodeId]||[];
+  const newSeq=rerun(nodeId,nm,ins);
+  replaced={kind,nodeId,oldOp,newOp:nm,oldCount:oldSeq,newCount:newSeq.pass.length,total:ins.length,newOuts:newSeq.outs};
+  updateCompare();
+  // 重置该算子下游计数，让面板按新算子重跑
+  resetFrom(nodeId);
+  toast('已替换 '+oldOp+' → '+nm+'（用已录输入重跑，下方对比）');
+}
+/* 算子行为模拟器：输入序列 → {pass[],outs[], dropped} */
+function rerun(nodeId,opName,ins){
+  const impl=(OPS[opName.startsWith('debounce')||opName.startsWith('throttle')||opName.startsWith('audit')||opName.startsWith('sample')?'debounce':'switch'])
+    .list.find(o=>o.nm===opName).impl;
+  return simulate(impl,ins);
+}
+function simulate(impl,ins){
+  if(impl==='debounce'){
+    const outs=[];let pend=null;
+    ins.forEach((x,i)=>{
+      pend=x;
+      const nxt=ins[i+1];
+      if(!nxt||nxt.t-pend.t>=300){outs.push({...pend,delay:300});pend=null;}
+    });
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    const all=[...dropped,...outs].sort((a,b)=>a.t-b.t);
+    return {pass:outs,outs:all};
+  }
+  if(impl==='throttle'){
+    const outs=[];let lastT=-1e9;
+    ins.forEach(x=>{if(x.t-lastT>=250){outs.push({...x});lastT=x.t;}else{outs.push({...x,drop:true});}});
+    return {pass:outs.filter(o=>!o.drop),outs};
+  }
+  if(impl==='audit'){
+    const outs=[];let last=null;
+    ins.forEach((x,i)=>{
+      last=x;
+      const nxt=ins[i+1];
+      if(!nxt||nxt.t-last.t>=300){outs.push({...last});last=null;}
+    });
+    // 被合并掉的值标 drop
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    const all=[...dropped,...outs].sort((a,b)=>a.t-b.t);
+    return {pass:outs,outs:all};
+  }
+  if(impl==='sample'){
+    const outs=[];let last=null;
+    ins.forEach((x,i)=>{
+      last=x;
+      const nxt=ins[i+1];
+      if(!nxt||nxt.t-last.t>=250){outs.push({...last});last=null;}
+    });
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    const all=[...dropped,...outs].sort((a,b)=>a.t-b.t);
+    return {pass:outs,outs:all};
+  }
+  if(impl==='switch'){ return {pass:ins,outs:ins}; }
+  if(impl==='exhaust'){
+    // 忙时忽略：间距<320 的后续值丢弃
+    const outs=[];let busyUntil=-1e9;
+    ins.forEach(x=>{
+      if(x.t<busyUntil){outs.push({...x,drop:true});}
+      else{busyUntil=x.t+320;outs.push({...x});}
+    });
+    return {pass:outs.filter(o=>!o.drop),outs};
+  }
+  if(impl==='merge'){ return {pass:ins,outs:ins}; }
+  if(impl==='concat'){ return {pass:ins,outs:ins}; }
+  return {pass:ins,outs:ins};
+}
+
+/* 更新对比面板 */
+function updateCompare(){
+  const oldCol=$('cmpOldBody'),newCol=$('cmpNewBody');
+  if(!replaced){$('cmpOldOp').textContent=curOps.debounce;$('cmpOldCnt').textContent='';oldCol.innerHTML='<div class="cmp-empty">运行后，点 debounce 或 switchMap 替换算子，这里会显示新旧输出对比。</div>';return;}
+  // 旧：该算子当前（已换后的）out 计数（我们保留替换前的旧计数）
+  const kind=replaced.kind;
+  const oldOpTxt=replaced.oldOp,newOpTxt=replaced.newOp;
+  $('cmpOldOp').textContent=oldOpTxt+'（原）';
+  $('cmpNewOp').textContent=newOpTxt+'（新）';
+  // 新输出
+  const newOuts=replaced.newOuts||[];
+  const newPass=newOuts.filter(o=>!o.drop).length;
+  $('cmpNewCnt').textContent=newPass+' 个输出 / 共 '+replaced.total+' 个输入';
+  newCol.innerHTML=newOuts.length?newOuts.map(o=>
+    '<div class="vrow'+(o.drop?' drop':' pass')+'"><span class="tm">'+fmt(o.t)+'</span><span class="val">'+o.value+'</span><span class="tag">'+(o.drop?'丢弃':'通过')+'</span></div>').join('')
+    :'<div class="cmp-empty">该算子对这段输入没有输出</div>';
+  // 旧：用旧算子对同样输入重跑
+  const oldIns=inputSeq[replaced.nodeId]||[];
+  const oldSim=rerun(replaced.nodeId,oldOpTxt,oldIns);
+  $('cmpOldCnt').textContent=oldSim.pass.length+' 个输出 / 共 '+oldIns.length+' 个输入';
+  oldCol.innerHTML=oldSim.outs.map(o=>
+    '<div class="vrow'+(o.drop?' drop':' pass')+'"><span class="tm">'+fmt(o.t)+'</span><span class="val">'+o.value+'</span><span class="tag">'+(o.drop?'丢弃':'通过')+'</span></div>').join('');
+}
+
+/* 重置某节点下游（让实时流按新算子重跑） */
+function resetFrom(nodeId){
+  const idx=nodes.findIndex(n=>n.id===nodeId);
+  // 清下游 out 计数（简化：重跑比较已足够，实时流继续跑新算子）
+  // 这里只清该节点之后的 out 记录，让下游计数重新累积
+  rec=rec.filter(e=>{
+    const ni=nodes.findIndex(n=>n.id===e.node);
+    return !(ni>idx && e.stage==='out');
+  });
+}
+
+/* ---- 控制 ---- */
+$('ctlRun').addEventListener('click',()=>{
+  if(running&&playing){playing=false;$('ctlRun').textContent='▶ 运行';$('status').textContent='已暂停';}
+  else{playing=true;$('ctlRun').textContent='⏸ 暂停';$('status').textContent='运行中';}
+});
+$('ctlReset').addEventListener('click',()=>{
+  rec=[];inputSeq={};packets=[];opState={};clock=0;ki=0;pid=0;feedTimer=0;
+  replaced=null;curOps={debounce:'debounceTime(300)',switch:'switchMap(fetch)'};
+  OPS.debounce.cur='debounceTime(300)';OPS.switch.cur='switchMap(fetch)';
+  updateCompare();updateUI();toast('已重置');
+});
+$('ctlFeed').addEventListener('click',()=>{if(running&&!playing){emitSource();}else emitSource();});
+$('ctlSpeed').addEventListener('click',()=>{
+  speed=speed>=3?1:speed+1;
+  $('ctlSpeed').textContent='速度 ×'+speed;
+});
+
+function updateUI(){
+  $('recInfo').textContent='已录 '+rec.length+' 事件 · '+fmt(clock);
+}
+
+/* toast */
+let toastTimer=null;
+function toast(msg){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+resize();
+updateCompare();
+raf=requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->

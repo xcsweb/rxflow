@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxFlow · 算子推荐</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1d24'/%3E%3Cpath d='M7 9l9 9-9 9' stroke='%23e8594f' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 9h9' stroke='%234da3ff' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0d0f14;--panel:#151922;--panel2:#1b2130;--line:#262e40;
+    --ink:#e9edf5;--muted:#94a0b5;--dim:#5d687c;
+    --accent:#4da3ff;--accent2:#3dd68c;--warn:#f2b04a;--bad:#e8594f;--vio:#9b7cf2;
+    --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  header h1{font-size:19px;font-weight:800}
+  header .tag{font-family:var(--mono);font-size:11px;color:var(--accent);border:1px solid rgba(77,163,255,.3);background:rgba(77,163,255,.08);padding:3px 10px;border-radius:20px}
+  .desc{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .desc b{color:var(--ink)}
+  .ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .ctl button{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .ctl button:hover{border-color:var(--accent)}
+  .ctl button.on{background:var(--accent);border-color:var(--accent);color:#081018;font-weight:600}
+  .status{font-family:var(--mono);font-size:11px;color:var(--accent2);margin-left:auto}
+
+  .flow-frame{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:18px}
+  canvas{display:block;width:100%}
+  .flow-foot{display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);flex-wrap:wrap}
+  #recInfo{margin-left:auto;font-family:var(--mono);font-size:11px}
+
+  /* 推荐卡片 */
+  .rec{display:none;background:linear-gradient(135deg,rgba(61,214,140,.06),rgba(77,163,255,.05));border:1px solid rgba(61,214,140,.25);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+  .rec.show{display:block}
+  .rec-kicker{font-family:var(--mono);font-size:11px;color:var(--accent2);letter-spacing:.5px;margin-bottom:10px;text-transform:uppercase}
+  .rec-title{font-size:16px;font-weight:700;margin-bottom:6px}
+  .rec-title .cur{color:var(--warn);font-family:var(--mono)}
+  .rec-title .sug{color:var(--accent2);font-family:var(--mono)}
+  .rec-reason{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .rec-reason b{color:var(--ink)}
+  .rec-sigs{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .sig{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;font-size:12px;color:var(--muted)}
+  .sig b{display:block;font-family:var(--mono);font-size:15px;color:var(--ink)}
+  .sig.warn b{color:var(--warn)}
+  .rec-cands{display:flex;gap:10px;flex-wrap:wrap}
+  .cand{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:12.5px;padding:8px 15px;border-radius:8px;cursor:pointer}
+  .cand:hover{border-color:var(--accent2)}
+  .cand.pick{background:rgba(61,214,140,.15);border-color:var(--accent2);color:var(--accent2);font-weight:600}
+  .cand .why{display:block;font-size:10.5px;color:var(--dim);font-weight:400;margin-top:2px}
+
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+  .cmp-col{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cmp-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+  .cmp-head .op{font-family:var(--mono);color:var(--accent)}
+  .cmp-head .cnt{font-size:11px;color:var(--dim);font-family:var(--mono);margin-left:auto}
+  .cmp-head.new{background:rgba(61,214,140,.06)}
+  .cmp-head.new .op{color:var(--accent2)}
+  .cmp-body{max-height:300px;overflow:auto;padding:6px 0}
+  .vrow{display:flex;align-items:center;gap:10px;padding:5px 16px;font-size:12.5px;border-left:3px solid transparent}
+  .vrow.drop{opacity:.45;border-left-color:var(--bad)}
+  .vrow.pass{border-left-color:var(--accent2)}
+  .vrow .tm{font-family:var(--mono);font-size:11px;color:var(--dim);width:64px;flex:none}
+  .vrow .val{font-family:var(--mono);color:#cfe4ff}
+  .vrow .tag{font-size:10px;margin-left:auto;padding:1px 7px;border-radius:9px}
+  .vrow.drop .tag{color:var(--bad);background:rgba(232,89,79,.12)}
+  .vrow.pass .tag{color:var(--accent2);background:rgba(61,214,140,.12)}
+  .cmp-empty{padding:26px;text-align:center;color:var(--dim);font-size:13px}
+
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:rgba(61,214,140,.15);border:1px solid rgba(61,214,140,.4);color:var(--accent2);padding:10px 20px;border-radius:10px;font-size:13px;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media (max-width:720px){ .compare{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>RxFlow · 算子推荐</h1>
+    <span class="tag">智能诊断演示</span>
+    <span class="status" id="status">运行中</span>
+  </header>
+  <p class="desc">点算子节点，面板<b>分析它的行为特征</b>（丢弃率 / 输出密度 / 延迟），按模式给出<b>候选算子 + 理由</b>——标注"取决于业务意图"，按模式给候选，不替你拍板。点候选即用已录输入重跑对比。</p>
+
+  <div class="ctl">
+    <button id="ctlRun" class="on">⏸ 暂停</button>
+    <button id="ctlReset">重置</button>
+    <button id="ctlSpeed">速度 ×1</button>
+  </div>
+
+  <div class="flow-frame">
+    <canvas id="flow"></canvas>
+    <div class="flow-foot">
+      <span>● 源自动发射（模拟打字）</span>
+      <span>· 红色 = 被丢弃</span>
+      <span id="recInfo"></span>
+    </div>
+  </div>
+
+  <div class="rec" id="recCard">
+    <div class="rec-kicker">Smart Suggestion</div>
+    <div class="rec-title">当前 <span class="cur" id="recCurOp"></span> → 建议试试 <span class="sug" id="recSug"></span></div>
+    <div class="rec-reason" id="recReason"></div>
+    <div class="rec-sigs" id="recSigs"></div>
+    <div class="rec-cands" id="recCands"></div>
+  </div>
+
+  <div class="compare">
+    <div class="cmp-col">
+      <div class="cmp-head"><span class="op" id="cmpOldOp">（原算子）</span><span class="cnt" id="cmpOldCnt"></span></div>
+      <div class="cmp-body" id="cmpOldBody"></div>
+    </div>
+    <div class="cmp-col">
+      <div class="cmp-head new"><span class="op" id="cmpNewOp">（未推荐）</span><span class="cnt" id="cmpNewCnt"></span></div>
+      <div class="cmp-body" id="cmpNewBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   RxFlow · 算子推荐演示
+   核心：行为特征分析 + 规则推荐 + 一键应用对比
+   - 运行录制每个算子的输入/输出
+   - 点算子节点 → 分析行为特征（丢弃率/密度/延迟）→ 规则匹配候选
+   - 点候选 → 用已录输入重跑 → 并排对比
+   纯原生 Canvas + JS，无依赖。
+   ========================================================= */
+const $=id=>document.getElementById(id);
+const cv=$('flow'),cx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+
+const SPEC=[
+  {id:'src',op:'source$',color:'#4da3ff',label:'用户输入',replaceable:false},
+  {id:'deb',op:'debounceTime(300)',color:'#f2b04a',label:'可诊断 · 防抖',replaceable:true,kind:'debounce'},
+  {id:'dist',op:'distinctUntilChanged',color:'#9b7cf2',label:'去重',replaceable:false},
+  {id:'sw',op:'switchMap(fetch)',color:'#4da3ff',label:'可诊断 · 取最新',replaceable:true,kind:'switch'},
+  {id:'out',op:'render()',color:'#3dd68c',label:'渲染',replaceable:false},
+];
+/* 候选算子库：含"推荐理由 / 何时用" */
+const OP_LIB={
+  debounceTime:{nm:'debounceTime(300)',impl:'debounce',grp:'debounce',use:'输入密集、只关心停顿后的结果'},
+  throttleTime:{nm:'throttleTime(250)',impl:'throttle',grp:'debounce',use:'要稳定节流、容忍每段只发首个'},
+  auditTime:{nm:'auditTime(300)',impl:'audit',grp:'debounce',use:'固定周期取末、不随输入节奏'},
+  sampleTime:{nm:'sampleTime(250)',impl:'sample',grp:'debounce',use:'固定时钟采样'},
+  switchMap:{nm:'switchMap(fetch)',impl:'switch',grp:'switch',use:'只关心最新、取消旧请求'},
+  exhaustMap:{nm:'exhaustMap(fetch)',impl:'exhaust',grp:'switch',use:'忙时忽略新、防重入'},
+  mergeMap:{nm:'mergeMap(fetch)',impl:'merge',grp:'switch',use:'要全部并发结果'},
+  concatMap:{nm:'concatMap(fetch)',impl:'concat',grp:'switch',use:'严格排队串行'},
+};
+let curOp={debounce:'debounceTime(300)',switch:'switchMap(fetch)'};
+let candsFor={debounce:['debounceTime(300)','throttleTime(250)','auditTime(300)','sampleTime(250)'],
+              switch:['switchMap(fetch)','exhaustMap(fetch)','mergeMap(fetch)','concatMap(fetch)']};
+
+let nodes=[],edges=[];
+function layout(){
+  const gap=56,pad=20;
+  const totalW=SPEC.length*130+(SPEC.length-1)*gap;
+  const x0=Math.max(10,(W-totalW)/2);
+  nodes=SPEC.map((s,i)=>({...s,x:x0+i*(130+gap),y:H/2-30,w:130,h:60}));
+  edges=[];for(let i=0;i<nodes.length-1;i++)edges.push({from:nodes[i].id,to:nodes[i+1].id});
+}
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  DPR=Math.min(devicePixelRatio||1,2);
+  W=r.width;H=200;
+  cv.width=Math.floor(W*DPR);cv.height=Math.floor(H*DPR);
+  cv.style.width=W+'px';cv.style.height=H+'px';
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+
+let running=true,playing=true,raf=null,lastTs=0,clock=0,pid=0;
+let packets=[],rec=[],inputSeq={};
+const KW=['苹','苹果','苹果手','苹果手机','苹果手','苹果','苹','苹手'];
+let ki=0,feedTimer=0,burstLeft=0,burstTimer=0,burstInterval=140;
+let speed=1;
+let applied=null;
+
+function nodeById(id){return nodes.find(n=>n.id===id);}
+function recIn(nodeId,value,drop){
+  rec.push({t:clock,node:nodeId,value,stage:drop?'drop':'in',drop:!!drop});
+  if(!inputSeq[nodeId])inputSeq[nodeId]=[];
+  inputSeq[nodeId].push({t:clock,value});
+}
+function recOut(nodeId,value){rec.push({t:clock,node:nodeId,value,stage:'out',drop:false});}
+function fmt(ms){const s=ms/1000;const m=Math.floor(s/60);return (m<10?'0':'')+m+':'+(s%60).toFixed(1).padStart(4,'0');}
+function emitSource(){
+  const v=KW[ki++%KW.length];
+  // 记录源发射（deb 的输入）
+  recIn('deb',v,false);
+  // 按当前 deb 算子在"源"处判定：debounce → 进缓冲（窗口末放行），throttle → 窗口首放行，其余放行
+  const k=curOp.debounce;
+  if(k==='debounceTime(300)'){
+    if(!opState.debBuf)opState.debBuf=[];
+    opState.debBuf.push({t:clock,value:v});
+    return; // 缓冲，停顿后由 flushDeb 释放末值
+  }
+  if(k==='throttleTime(250)'){
+    if(opState.thT!==undefined&&clock-opState.thT<250)return; // 窗口内丢弃
+    opState.thT=clock;
+    spawnFromDeb(v,180);
+    return;
+  }
+  if(k==='auditTime(300)'||k==='sampleTime(250)'){
+    spawnFromDeb(v,260);return;
+  }
+  spawnFromDeb(v,120);
+}
+function spawnFromDeb(v,delay){
+  packets.push({id:++pid,edge:'deb→dist',progress:0,value:v,color:'#f2b04a',dead:false,held:false,hold:delay,nextEdge:null});
+}
+function flushDeb(){
+  if(!opState.debBuf||!opState.debBuf.length)return;
+  const lastIn=opState.debBuf[opState.debBuf.length-1].t;
+  // 停顿 300ms（无新值）后才放行最后一个 —— 这才是 debounce 语义
+  if(clock-lastIn>=300){
+    const last=opState.debBuf[opState.debBuf.length-1];
+    recOut('deb',last.value);
+    opState.debBuf=[];
+    spawnFromDeb(last.value,300);
+  }
+}
+function advance(dt){
+  for(const p of packets){
+    if(p.dead)continue;
+    if(p.held){p.hold-=dt;if(p.hold<=0){if(p.nextEdge){p.edge=p.nextEdge;p.progress=0;}p.held=false;p.nextEdge=null;}continue;}
+    const e=edges.find(x=>x.from+'→'+x.to===p.edge);
+    if(!e){p.dead=true;continue;}
+    const from=nodeById(e.from),to=nodeById(e.to);
+    const len=Math.max(1,Math.abs(to.x-from.x));
+    p.progress+=dt*(0.08+0.04*speed)*60;
+    if(p.progress>=len){
+      if(!to){p.dead=true;continue;}
+      if(to.id==='deb'||to.id==='dist'||to.id==='sw'){
+        const res=applyOpLive(to.id,p.value);
+        recOut(to.id,p.value);
+        if(!res.pass){p.dead=true;continue;}
+        const delay=res.delay||0;
+        if(delay>0){p.held=true;p.hold=delay;}
+        const nextE=edges.find(x=>x.from===to.id);
+        if(nextE){p.nextEdge=nextE.from+'→'+nextE.to;}
+        if(delay<=0&&nextE){p.edge=nextE.from+'→'+nextE.to;p.progress=0;}
+      } else if(to.id==='out'){recOut('out',p.value);p.dead=true;}
+      else{const nextE=edges.find(x=>x.from===to.id);if(nextE){p.edge=nextE.from+'→'+nextE.to;p.progress=0;}else p.dead=true;}
+    }
+  }
+  packets=packets.filter(p=>!p.dead);
+}
+let opState={};
+function applyOpLive(nodeId,value){
+  if(nodeId==='dist'){if(opState.lastDist===value)return {pass:false};opState.lastDist=value;return {pass:true};}
+  if(nodeId==='sw'){
+    const k=curOp.switch;
+    if(k==='switchMap(fetch)')return {pass:true,delay:320};
+    if(k==='exhaustMap(fetch)'){if(opState.busy)return {pass:false};opState.busy=true;setTimeout(()=>opState.busy=false,320);return {pass:true,delay:320};}
+    if(k==='mergeMap(fetch)')return {pass:true,delay:180};
+    if(k==='concatMap(fetch)')return {pass:true,delay:260};
+  }
+  return {pass:true};
+}
+function loop(ts){
+  if(!lastTs)lastTs=ts;
+  const dt=Math.min(60,ts-lastTs);lastTs=ts;
+  if(running&&playing){
+    clock+=dt;
+    flushDeb();
+    feedTimer-=dt;
+    if(burstLeft>0){burstTimer-=dt;if(burstTimer<=0){burstTimer=burstInterval/speed;burstLeft--;emitSource();}}
+    else if(feedTimer<=0){feedTimer=1100/speed;burstLeft=3;burstTimer=0;}
+    advance(dt);
+  }
+  draw();updateUI();
+  raf=requestAnimationFrame(loop);
+}
+
+/* ---- 绘制 ---- */
+function draw(){
+  cx.clearRect(0,0,W,H);
+  cx.strokeStyle='rgba(38,46,64,.35)';cx.lineWidth=1;const gs=24;
+  for(let x=gs*.5;x<W;x+=gs){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+  for(let y=gs*.5;y<H;y+=gs){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+  for(const e of edges){
+    const a=nodeById(e.from),b=nodeById(e.to);
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2,mx=(x1+x2)/2;
+    cx.strokeStyle='rgba(255,255,255,.09)';cx.lineWidth=1.5;
+    cx.beginPath();cx.moveTo(x1,y1);cx.bezierCurveTo(mx,y1,mx,y2,x2,y2);cx.stroke();
+  }
+  for(const p of packets){
+    if(p.dead)continue;
+    const e=edges.find(x=>x.from+'→'+x.to===p.edge);if(!e)continue;
+    const a=nodeById(e.from),b=nodeById(e.to);
+    const len=Math.max(1,Math.abs(b.x-a.x)),t=Math.min(1,p.progress/len);
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2,mx=(x1+x2)/2;
+    const px=(1-t)*(1-t)*x1+2*(1-t)*t*mx+t*t*x2,py=(1-t)*(1-t)*y1+2*(1-t)*t*((y1+y2)/2)+t*t*y2;
+    cx.fillStyle='#10141b';cx.strokeStyle='#3b4659';cx.lineWidth=1.2;
+    const bw=Math.max(26,Math.min(60,8+String(p.value).length*6)),bh=17;
+    rrect(px-bw/2,py-bh/2,bw,bh,4);cx.fill();cx.stroke();
+    cx.fillStyle='#cfe4ff';cx.font='9.5px monospace';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(p.value,px,py+.5);
+  }
+  for(const n of nodes){
+    const isRep=n.replaceable;
+    cx.fillStyle=isRep?'#1a202b':'#181d27';
+    cx.strokeStyle=isRep?'rgba(242,176,74,.7)':n.color;
+    cx.lineWidth=isRep?1.8:1.5;
+    rrect(n.x,n.y,n.w,n.h,9);cx.fill();cx.stroke();
+    if(isRep){
+      cx.fillStyle='rgba(242,176,74,.15)';
+      cx.beginPath();cx.moveTo(n.x+n.w,n.y+n.h-14);cx.lineTo(n.x+n.w,n.y+n.h);cx.lineTo(n.x+n.w-14,n.y+n.h);cx.closePath();cx.fill();
+      cx.fillStyle='#f2b04a';cx.font='9px monospace';cx.textAlign='right';cx.textBaseline='bottom';
+      cx.fillText('诊',n.x+n.w-4,n.y+n.h-3);
+    }
+    cx.fillStyle='#f0f3fa';cx.font='600 11.5px sans-serif';cx.textAlign='left';cx.textBaseline='middle';
+    cx.fillText(n.op,n.x+12,n.y+22);
+    cx.fillStyle='#6b7486';cx.font='9.5px sans-serif';cx.textAlign='left';
+    cx.fillText(n.label,n.x+12,n.y+40);
+    const cnt=countFor(n.id);
+    if(cnt>0){
+      const txt=String(cnt),wpx=9+txt.length*6;
+      cx.fillStyle=n.color;cx.beginPath();cx.arc(n.x+n.w-12,n.y+12,wpx/2,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#081018';cx.font='bold 9px monospace';cx.textAlign='center';cx.textBaseline='middle';
+      cx.fillText(txt,n.x+n.w-12,n.y+12.5);
+    }
+  }
+}
+function rrect(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath();}
+function countFor(id){return rec.filter(e=>e.node===id&&e.stage==='out').length;}
+
+/* ---- 行为特征分析 ---- */
+function analyze(nodeId){
+  const ins=inputSeq[nodeId]||[];
+  const outs=rec.filter(e=>e.node===nodeId&&e.stage==='out');
+  const inCnt=ins.length,outCnt=outs.length;
+  const dropRate=inCnt?Math.round((inCnt-outCnt)/inCnt*100):0;
+  // 输出密度：每秒输出数（估算）
+  const span=inCnt?(ins[ins.length-1].t-ins[0].t):1;
+  const density=span>0?outCnt/(span/1000):0;
+  // 平均输入间隔
+  let avgGap=0;
+  if(ins.length>1){let s=0;for(let i=1;i<ins.length;i++)s+=ins[i].t-ins[i-1].t;avgGap=s/(ins.length-1);}
+  return {inCnt,outCnt,dropRate,density,avgGap,ins};
+}
+
+/* ---- 规则推荐：返回 {sug, reason, sigs} ---- */
+function recommend(nodeId,ana){
+  const k=nodeId==='deb'?curOp.debounce:curOp.switch;
+  const grp=k==='debounceTime(300)'||k==='throttleTime(250)'||k==='auditTime(300)'||k==='sampleTime(250)'?'debounce':'switch';
+  const sigs=[];
+  const cands=candsFor[grp==='debounce'?'debounce':'switch'];
+  const candidates=cands.map(cn=>OP_LIB[cn.split('(')[0]||cn]?OP_LIB[cn.split('(')[0]]:null).filter(Boolean);
+  let sug=null,reason='';
+  const curLib=OP_LIB[k.split('(')[0]]||{};
+  if(grp==='debounce'){
+    sigs.push({l:'丢弃率',v:ana.dropRate+'%',warn:ana.dropRate>=50});
+    sigs.push({l:'输出/输入',v:ana.outCnt+'/'+ana.inCnt});
+    sigs.push({l:'平均输入间隔',v:Math.round(ana.avgGap)+'ms',warn:ana.avgGap>0&&ana.avgGap<300});
+    sigs.push({l:'输出密度',v:ana.density.toFixed(1)+'/s'});
+    if(ana.dropRate>=50){
+      sug='throttleTime(250)';
+      reason='输入密集（丢弃率 '+ana.dropRate+'%），debounce 把所有非停顿末值合并掉了。如果希望<b>响应更快、每段也能发出首个值</b>，throttleTime 更合适；若只关心固定周期，可试 auditTime。';
+    } else {
+      sug='auditTime(300)';
+      reason='丢弃率不高，输入相对稀疏。若想输出节奏<b>更稳定、不受输入时机影响</b>，auditTime（固定周期取末）是替代候选。';
+    }
+  } else {
+    sigs.push({l:'丢弃率',v:ana.dropRate+'%',warn:ana.dropRate>=50});
+    sigs.push({l:'输出/输入',v:ana.outCnt+'/'+ana.inCnt});
+    sigs.push({l:'输出密度',v:ana.density.toFixed(1)+'/s'});
+    if(ana.dropRate>=50){
+      sug='mergeMap(fetch)';
+      reason='switchMap 丢弃率 '+ana.dropRate+'%：它一直在取消旧请求、只留最新。如果<b>每个输入的结果都重要</b>，mergeMap 会全部保留；若担心重入/负载，exhaustMap 忙时忽略新。';
+    } else {
+      sug='exhaustMap(fetch)';
+      reason='丢弃率不高。若请求较重、想<b>避免并发堆积</b>，exhaustMap（忙时忽略新）比 switchMap 更省；若确需全部结果则 mergeMap。';
+    }
+  }
+  return {sug,reason,sigs,candidates,grp,cur:k};
+}
+
+/* 点击节点 → 诊断 + 推荐 */
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  const n=nodes.find(n=>n.replaceable&&x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h);
+  if(!n){$('recCard').classList.remove('show');return;}
+  const ana=analyze(n.id);
+  const rec=recommend(n.id,ana);
+  showRec(n,rec,ana);
+});
+function showRec(n,rec,ana){
+  $('recCurOp').textContent=rec.cur;
+  $('recSug').textContent=rec.sug;
+  $('recReason').innerHTML=rec.reason;
+  $('recSigs').innerHTML=rec.sigs.map(s=>'<div class="sig'+(s.warn?' warn':'')+'"><b>'+s.v+'</b>'+s.l+'</div>').join('');
+  $('recCands').innerHTML=rec.candidates.map(c=>{
+    const sel=c.nm===rec.sug;
+    return '<button class="cand'+(sel?' pick':'')+'" data-nm="'+c.nm+'"><span>'+(sel?'建议 ':'')+c.nm+'</span><span class="why">'+c.use+'</span></button>';
+  }).join('');
+  // 绑定候选
+  document.querySelectorAll('#recCands .cand').forEach(btn=>{
+    btn.onclick=()=>applyCandidate(n.id,btn.dataset.nm,rec.grp);
+  });
+  $('recCard').classList.add('show');
+}
+
+/* 应用候选 → 重跑对比 */
+function applyCandidate(nodeId,nm,grp){
+  const key=grp==='debounce'?'debounce':'switch';
+  const oldOp=curOp[key];
+  if(oldOp===nm){toast('已是 '+nm);return;}
+  curOp[key]=nm;
+  const ins=inputSeq[nodeId]||[];
+  const sim=simulate(OP_LIB[nm.split('(')[0]].impl,ins);
+  applied={nodeId,oldOp,newOp:nm,total:ins.length,newOuts:sim.outs};
+  updateCompare();
+  toast('已推荐应用 '+oldOp+' → '+nm+'（用已录输入重跑对比）');
+}
+
+/* 算子模拟器（与替换演示一致） */
+function simulate(impl,ins){
+  if(impl==='debounce'){
+    const outs=[];let pend=null;
+    ins.forEach((x,i)=>{pend=x;const nxt=ins[i+1];if(!nxt||nxt.t-pend.t>=300){outs.push({...pend,delay:300});pend=null;}});
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    return {outs:[...dropped,...outs].sort((a,b)=>a.t-b.t)};
+  }
+  if(impl==='throttle'){
+    const outs=[];let lastT=-1e9;
+    ins.forEach(x=>{if(x.t-lastT>=250){outs.push({...x});lastT=x.t;}else{outs.push({...x,drop:true});}});
+    return {outs};
+  }
+  if(impl==='audit'){
+    const outs=[];let last=null;
+    ins.forEach((x,i)=>{last=x;const nxt=ins[i+1];if(!nxt||nxt.t-last.t>=300){outs.push({...last});last=null;}});
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    return {outs:[...dropped,...outs].sort((a,b)=>a.t-b.t)};
+  }
+  if(impl==='sample'){
+    const outs=[];let last=null;
+    ins.forEach((x,i)=>{last=x;const nxt=ins[i+1];if(!nxt||nxt.t-last.t>=250){outs.push({...last});last=null;}});
+    const dropped=ins.filter(x=>!outs.some(o=>o.t===x.t&&o.value===x.value)).map(x=>({...x,drop:true}));
+    return {outs:[...dropped,...outs].sort((a,b)=>a.t-b.t)};
+  }
+  if(impl==='switch')return {outs:ins};
+  if(impl==='exhaust'){
+    const outs=[];let busyUntil=-1e9;
+    ins.forEach(x=>{if(x.t<busyUntil){outs.push({...x,drop:true});}else{busyUntil=x.t+320;outs.push({...x});}});
+    return {outs};
+  }
+  if(impl==='merge')return {outs:ins};
+  if(impl==='concat')return {outs:ins};
+  return {outs:ins};
+}
+
+/* 对比面板 */
+function updateCompare(){
+  if(!applied){$('cmpOldBody').innerHTML='<div class="cmp-empty">点算子节点，会推荐候选；点"建议"按钮即用已录输入重跑对比。</div>';return;}
+  $('cmpOldOp').textContent=applied.oldOp+'（原）';
+  $('cmpNewOp').textContent=applied.newOp+'（新）';
+  const newOuts=applied.newOuts||[];
+  const newPass=newOuts.filter(o=>!o.drop).length;
+  $('cmpNewCnt').textContent=newPass+' 个输出 / 共 '+applied.total+' 个输入';
+  $('cmpNewBody').innerHTML=newOuts.length?newOuts.map(o=>
+    '<div class="vrow'+(o.drop?' drop':' pass')+'"><span class="tm">'+fmt(o.t)+'</span><span class="val">'+o.value+'</span><span class="tag">'+(o.drop?'丢弃':'通过')+'</span></div>').join('')
+    :'<div class="cmp-empty">无输出</div>';
+  // 旧：用旧算子重跑
+  const oldIns=inputSeq[applied.nodeId]||[];
+  const oldSim=simulate(OP_LIB[applied.oldOp.split('(')[0]].impl,oldIns);
+  const oldPass=oldSim.outs.filter(o=>!o.drop).length;
+  $('cmpOldCnt').textContent=oldPass+' 个输出 / 共 '+oldIns.length+' 个输入';
+  $('cmpOldBody').innerHTML=oldSim.outs.map(o=>
+    '<div class="vrow'+(o.drop?' drop':' pass')+'"><span class="tm">'+fmt(o.t)+'</span><span class="val">'+o.value+'</span><span class="tag">'+(o.drop?'丢弃':'通过')+'</span></div>').join('');
+}
+
+/* 控制 */
+$('ctlRun').addEventListener('click',()=>{
+  if(running&&playing){playing=false;$('ctlRun').textContent='▶ 运行';$('status').textContent='已暂停';}
+  else{playing=true;$('ctlRun').textContent='⏸ 暂停';$('status').textContent='运行中';}
+});
+$('ctlReset').addEventListener('click',()=>{
+  rec=[];inputSeq={};packets=[];opState={};clock=0;ki=0;pid=0;feedTimer=0;burstLeft=0;
+  applied=null;curOp={debounce:'debounceTime(300)',switch:'switchMap(fetch)'};
+  $('recCard').classList.remove('show');
+  updateCompare();updateUI();toast('已重置');
+});
+$('ctlSpeed').addEventListener('click',()=>{speed=speed>=3?1:speed+1;$('ctlSpeed').textContent='速度 ×'+speed;});
+
+function updateUI(){$('recInfo').textContent='已录 '+rec.length+' 事件 · '+fmt(clock);}
+let toastTimer=null;
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}
+
+resize();
+updateCompare();
+raf=requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->

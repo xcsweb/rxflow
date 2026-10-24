@@ -1,0 +1,50 @@
+{
+  "name": "rx-flow",
+  "version": "0.2.0",
+  "description": "RxJS 流调试控制台：import 一次，右下角悬浮球点开看 Observable 数据流的实时动画、中途值、错误与管道拓扑。RxJS 之于 Redux DevTools。",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./style.css": "./src/ui/panel.css"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./src/index.js"
+  ],
+  "scripts": {
+    "demo": "node _server.cjs",
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "rxjs",
+    "observable",
+    "devtools",
+    "debug",
+    "debugger",
+    "reactive",
+    "visualization",
+    "vconsole",
+    "time-travel"
+  ],
+  "author": "rxflow",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "peerDependencies": {
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "rxjs": "^7.8.1"
+  }
+}

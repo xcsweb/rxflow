@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxJS 可视化调试面板 · 原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1d24'/%3E%3Cpath d='M7 9l9 9-9 9' stroke='%23e8594f' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 9h9' stroke='%234da3ff' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a22; --panel2:#1c212c; --line:#262d3b;
+    --ink:#e8ecf3; --muted:#8a94a6; --dim:#5b6475;
+    --accent:#4da3ff; --good:#3dd68c; --warn:#f2b04a; --bad:#e8594f;
+    --mono:"SFMono-Regular",Consolas,"Roboto Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);color:var(--ink);font-family:var(--sans);
+    display:flex;flex-direction:column;min-height:100vh;overflow:hidden;
+  }
+  /* ===== 顶部栏 ===== */
+  .topbar{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);
+    flex:none;
+  }
+  .brand{display:flex;align-items:center;gap:9px;margin-right:4px}
+  .brand .logo{width:26px;height:26px;flex:none}
+  .brand b{font-size:14px;letter-spacing:.2px}
+  .brand span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .tag{
+    font-size:10.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);
+    color:var(--muted);background:var(--panel2);font-family:var(--mono)
+  }
+  .tag.live{color:#0f1115;background:var(--good);border-color:transparent;font-weight:600}
+  .spacer{flex:1}
+  .ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .btn{
+    appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+    font-size:12.5px;padding:6px 13px;border-radius:7px;cursor:pointer;font-family:var(--sans);
+    transition:background .12s,border-color .12s;min-height:34px;display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#081018;font-weight:600}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.sm{font-size:11.5px;padding:4px 10px;min-height:28px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{
+    appearance:none;border:none;background:var(--panel2);color:var(--muted);font-size:11.5px;
+    padding:6px 11px;cursor:pointer;font-family:var(--mono);border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--accent);color:#081018;font-weight:600}
+  .lbl{font-size:11px;color:var(--muted);margin-right:-2px}
+  input[type=range]{accent-color:var(--accent);width:90px}
+  .val{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-width:44px}
+
+  /* ===== 主体 ===== */
+  .body{flex:1;display:flex;min-height:0;position:relative}
+  .stageWrap{flex:1;position:relative;min-width:0}
+  #stage{position:absolute;inset:0;display:block;width:100%;height:100%}
+  .hintbar{
+    position:absolute;left:14px;bottom:12px;right:14px;display:flex;gap:10px;flex-wrap:wrap;
+    font-size:11px;color:var(--dim);pointer-events:none;z-index:3;
+  }
+  .hintbar span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+  .dot.good{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)} .dot.accent{background:var(--accent)}
+
+  /* ===== 检查器 ===== */
+  .inspector{
+    width:340px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .ins-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .ins-head h3{font-size:12.5px;font-weight:600;flex:1;display:flex;align-items:center;gap:8px}
+  .ins-head .op-tag{font-family:var(--mono);font-size:10.5px;color:var(--accent);background:var(--panel2);border:1px solid var(--line);padding:1px 7px;border-radius:5px}
+  .close{appearance:none;border:none;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:2px 4px}
+  .close:hover{color:var(--ink)}
+  .ins-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+  .ins-empty{color:var(--dim);font-size:12.5px;line-height:1.7;padding-top:6px}
+  .ins-empty b{color:var(--muted);display:block;margin-bottom:6px;font-size:13px}
+  .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .kpi .cell{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px;text-align:center}
+  .kpi .k{font-size:10px;color:var(--muted);margin-bottom:3px}
+  .kpi .v{font-family:var(--mono);font-size:15px;font-weight:600}
+  .kpi .v.good{color:var(--good)} .kpi .v.warn{color:var(--warn)} .kpi .v.bad{color:var(--bad)}
+  .sec-t{font-size:10.5px;letter-spacing:.6px;color:var(--dim);margin:2px 0 6px;text-transform:uppercase;font-family:var(--mono)}
+  .stream{
+    display:flex;flex-direction:column;gap:7px;max-height:180px;overflow-y:auto;
+    border:1px solid var(--line);border-radius:7px;background:var(--panel2);padding:8px;
+  }
+  .row{
+    display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);
+  }
+  .row .t{color:var(--dim);flex:none;width:44px}
+  .row .dir{color:var(--muted);flex:none}
+  .row .p{
+    flex:1;background:#0d1015;border:1px solid var(--line);border-radius:4px;
+    padding:3px 7px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .row .p.out{color:var(--good)} .row .p.dropped{color:var(--bad);text-decoration:line-through}
+  .marker{width:7px;height:7px;border-radius:50%;flex:none}
+  .marker.in{background:var(--accent)} .marker.out{background:var(--good)} .marker.dropped{background:var(--bad)}
+  .desc{font-size:11.5px;color:var(--muted);line-height:1.6;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:9px 11px}
+  .desc code{color:var(--accent);font-family:var(--mono);font-size:11px}
+  .ins-foot{padding:10px 14px;border-top:1px solid var(--line);font-size:10.5px;color:var(--dim);display:flex;gap:12px;flex:none}
+  .ins-foot span{display:inline-flex;align-items:center;gap:5px}
+
+  /* ===== 移动端 ===== */
+  @media (max-width:760px){
+    body{overflow:auto}
+    .body{flex-direction:column;min-height:0}
+    .stageWrap{height:56vh;flex:none}
+    .inspector{width:100%;border-left:none;border-top:1px solid var(--line);max-height:none}
+    .ins-body{max-height:44vh}
+    .topbar{gap:8px}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1a1d24"/><path d="M7 9l9 9-9 9" stroke="#e8594f" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 9h9" stroke="#4da3ff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
+    <b>RxJS 流调试面板</b><span>v0.1 · prototype</span>
+  </div>
+  <span class="tag live" id="liveTag">● 运行中</span>
+  <span class="spacer"></span>
+  <div class="ctrl">
+    <span class="lbl">场景</span>
+    <div class="seg" id="scenarioSeg"></div>
+  </div>
+  <div class="ctrl">
+    <button class="btn primary sm" id="btnRun">⏸ 暂停</button>
+    <button class="btn sm" id="btnStep">单步</button>
+    <button class="btn sm" id="btnReset">重置</button>
+    <span class="lbl">速度</span>
+    <input type="range" id="speed" min="1" max="10" value="5">
+  </div>
+</div>
+
+<div class="body">
+  <div class="stageWrap">
+    <canvas id="stage"></canvas>
+    <div class="hintbar">
+      <span><i class="dot accent"></i>数据包流动</span>
+      <span><i class="dot good"></i>通过节点</span>
+      <span><i class="dot warn"></i>被过滤/丢弃</span>
+      <span><i class="dot bad"></i>出错/终止</span>
+      <span style="margin-left:auto">点击任意节点查看它中途收到的值</span>
+    </div>
+  </div>
+
+  <aside class="inspector" id="inspector">
+    <div class="ins-head">
+      <h3><i class="dot" id="insDot" style="background:var(--accent)"></i><span id="insTitle">节点检查器</span><span class="op-tag" id="insOp"></span></h3>
+      <button class="close" id="insClose" title="关闭">×</button>
+    </div>
+    <div class="ins-body" id="insBody">
+      <div class="ins-empty" id="insEmpty">
+        <b>点一个节点，看它中途的值</b>
+        这就是替代 <code>console.log</code> 的方式——每个操作符节点都记录它<b>收到</b>什么、<b>放行</b>什么、<b>丢弃</b>什么。不用再到处插 <code>tap()</code> 打印，流的每一步都摊开给你看。
+      </div>
+      <div id="insContent" style="display:none;flex-direction:column;gap:12px"></div>
+    </div>
+    <div class="ins-foot">
+      <span><i class="dot accent"></i>in 收到</span>
+      <span><i class="dot good"></i>out 放行</span>
+      <span><i class="dot bad"></i>drop 丢弃</span>
+    </div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   RxJS 可视化调试面板 —— 原型
+   - 纯原生 JS + Canvas，无外部依赖
+   - 用轻量"响应式模拟引擎"驱动一个示例数据流
+   - 数据以"数据包"动画沿节点连线流动，可在中途任意节点观察值
+   ========================================================= */
+
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+const canvas = $('stage');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+function resize(){
+  const wrap = canvas.parentElement;
+  const rect = wrap.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = rect.width; H = rect.height;
+  canvas.width = Math.max(1, Math.floor(W * DPR));
+  canvas.height = Math.max(1, Math.floor(H * DPR));
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  layout();
+}
+window.addEventListener('resize', resize);
+
+/* ---------- 场景定义 ----------
+   场景 = 一条可可视化的 RxJS 管道。每个操作符节点描述：
+   op: 显示名 / 逻辑类型
+   kind: transform(变换) | filter(过滤) | delay(延迟) | merge(合并)
+   label: 中文说明
+   fn 行为由引擎实现，节点只声明"发生了什么" */
+const SCENARIOS = {
+  search: {
+    name: '搜索输入 · 防抖+去重',
+    desc: '模拟输入框连续输入，经 debounceTime 防抖、distinctUntilChanged 去重、switchMap 发起请求、map 提取结果。',
+    source: 'input$  用户输入',
+    nodes: [
+      { id:'deb', op:'debounceTime(300)', kind:'delay', delay:300, label:'防抖：停止输入 300ms 后放行', color:'#f2b04a' },
+      { id:'dist', op:'distinctUntilChanged()', kind:'filter', label:'去重：与上一次相同则丢弃', color:'#9b7cf2' },
+      { id:'sw', op:'switchMap(req)', kind:'merge', label:'切流：只保留最新请求，旧流取消', color:'#4da3ff' },
+      { id:'map', op:'map(r => r.items)', kind:'transform', label:'提取：从响应里取出结果', color:'#3dd68c' },
+    ]
+  },
+  retry: {
+    name: '请求重试 · 失败回退',
+    desc: '模拟 fetch 可能失败，经 catchError 捕获错误、retry 重试、timeout 超时、map 处理。',
+    source: 'http$  请求流',
+    nodes: [
+      { id:'timeout', op:'timeout(800)', kind:'delay', delay:500, label:'超时：800ms 无响应则报错', color:'#f2b04a' },
+      { id:'retry', op:'retry(2)', kind:'retry', label:'重试：失败后重试最多 2 次', color:'#e8594f' },
+      { id:'catch', op:'catchError()', kind:'transform', label:'兜底：捕获错误返回默认值', color:'#9b7cf2' },
+      { id:'map', op:'map(res => res.data)', kind:'transform', label:'提取：取出数据字段', color:'#3dd68c' },
+    ]
+  },
+  combine: {
+    name: '合并流 · combineLatest',
+    desc: '模拟两个数据源（价格+数量），经 combineLatest 合并、filter 过滤无效值、map 计算金额。',
+    source: 'price$ · qty$  两路流',
+    nodes: [
+      { id:'comb', op:'combineLatest()', kind:'combine', label:'合并：任一更新都产出最新组合', color:'#9b7cf2' },
+      { id:'filter', op:'filter(v => v>0)', kind:'filter', label:'过滤：数量为 0 或负数则丢弃', color:'#f2b04a' },
+      { id:'map', op:'map(v => p*q)', kind:'transform', label:'计算：单价 × 数量', color:'#3dd68c' },
+    ]
+  }
+};
+
+/* ---------- 轻量响应式模拟引擎 ---------- */
+/* 设计上模仿 RxJS 的订阅模型：一个源会持续"发射"值，
+   值以数据包形式沿 edges 流动，每个节点决定放行/丢弃/变换/延迟。
+   这里没有引入真实 RxJS，原型阶段用引擎驱动可视化。 */
+
+let scenarioKey = 'search';
+let packets = [];      // 在途数据包
+let nodeLogs = {};     // nodeId -> {in:[],out:[],drop:[]}
+let nodeCounts = {};   // nodeId -> {in,out,drop}
+let running = true;
+let speed = 5;
+let raf = null;
+let lastTs = 0;
+let stepQueue = [];    // 单步模式：每帧放行一个待发射
+let emitTimer = 0;
+
+let nodes = [];        // 布局后的节点 {id,x,y,w,h,...}
+let edges = [];        // {from,to}
+let sourceNode = null;
+let sinkNode = null;
+
+/* 每个节点累计 emit 计数，用于把新包投递到入口 */
+let sourceEmitCount = 0;
+const SINK_LABEL = 'subscribe()';
+
+function buildGraph(){
+  const sc = SCENARIOS[scenarioKey];
+  const list = sc.nodes.slice();
+  sourceNode = { id:'__src', op:'source', kind:'source', label:sc.source, color:'#4da3ff' };
+  sinkNode = { id:'__sink', op:'subscribe', kind:'sink', label:SINK_LABEL, color:'#8a94a6' };
+  nodes = [sourceNode, ...list, sinkNode];
+  edges = [];
+  for(let i=0;i<nodes.length-1;i++) edges.push({from:nodes[i].id, to:nodes[i+1].id});
+  // 初始化日志
+  nodeLogs = {}; nodeCounts = {};
+  nodes.forEach(n => { nodeLogs[n.id]={in:[],out:[],drop:[]}; nodeCounts[n.id]={in:0,out:0,drop:0}; });
+  packets = [];
+  sourceEmitCount = 0;
+  emitTimer = 0;
+}
+
+/* ---------- 布局 ---------- */
+function layout(){
+  if(!nodes.length) return;
+  const pad = 12;
+  // 自适应：桌面基准 W=720 时 nodeW=188 gapX=66；窄屏按比例压缩
+  const baseW = 720;
+  let scale = Math.max(0.5, Math.min(1, W / baseW));
+  let nodeW = Math.round(188 * scale);
+  let gapX  = Math.round(66  * scale);
+  let nodeH = Math.round(58  * scale);
+  // 若仍超宽，等比压到刚好放下
+  const avail = W - pad*2;
+  let totalW = nodeW*nodes.length + gapX*(nodes.length-1);
+  if(totalW > avail){
+    const k = avail / totalW;
+    nodeW = Math.max(80, Math.round(nodeW*k));
+    gapX  = Math.max(12, Math.round(gapX*k));
+    totalW = nodeW*nodes.length + gapX*(nodes.length-1);
+  }
+  window.__rxflowScale = scale;
+  let x0 = Math.max(pad, (W - totalW)/2);
+  const midY = H/2;
+  nodes.forEach((n,i)=>{
+    n.x = x0 + i*gapX;
+    n.y = midY - nodeH/2;
+    n.w = nodeW; n.h = nodeH;
+  });
+}
+
+/* ---------- 数据包 ---------- */
+let packetId = 0;
+function spawnPackets(){
+  // 源按一定频率发射新值
+  const interval = Math.max(90, 340 - speed*26);
+  emitTimer -= 16;
+  if(emitTimer <= 0){
+    emitTimer = interval;
+    if(running || stepQueue.length){
+      const val = nextSourceValue();
+      sourceEmitCount++;
+      const from = nodes[0];
+      packets.push({
+        id: ++packetId,
+        fromEdge: 0,
+        progress: 0,
+        value: val,
+        label: JSON.stringify(val),
+        dead: false,
+        droppedAt: null,
+        targetValue: val
+      });
+      // 记录源 → 第一个节点
+      pushLog(nodes[1], 'in', val);
+      if(stepQueue.length) stepQueue.shift();
+    }
+  }
+}
+
+function nextSourceValue(){
+  const sc = SCENARIOS[scenarioKey];
+  if(scenarioKey==='search'){
+    const arr = ['r','re','rea','react','reacti','reactiv','reactive'];
+    return arr[sourceEmitCount % arr.length];
+  }
+  if(scenarioKey==='retry'){
+    const fail = (sourceEmitCount%3===0); // 周期性失败
+    return fail ? {err:'网络错误', code:503} : {data:{ok:true, value:sourceEmitCount*10}};
+  }
+  if(scenarioKey==='combine'){
+    // 交替发价格/数量
+    const seq = sourceEmitCount % 6;
+    const price = [10,10,10,12,12,9][seq];
+    const qty   = [0,2,3,2,5,1][seq];
+    return {price, qty};
+  }
+  return sourceEmitCount;
+}
+
+function pushLog(node, kind, val){
+  if(!node) return;
+  const entry = { v: safeStr(val), ts: Date.now() };
+  const arr = nodeLogs[node.id][kind];
+  if(arr.length>=40) arr.shift();
+  arr.push(entry);
+  nodeCounts[node.id][kind]++;
+}
+
+function safeStr(v){
+  if(v===undefined) return 'undefined';
+  if(typeof v==='object' && v!==null){
+    try{ return JSON.stringify(v); }catch(e){ return String(v); }
+  }
+  return String(v);
+}
+
+/* 对值套用某节点的变换逻辑（用于包在节点处加工） */
+function transformFor(node, val){
+  const id = node.id;
+  if(id==='map' && scenarioKey==='search') return { items: ['苹果','香蕉','草莓','芒果','葡萄'] };
+  if(id==='catch') return { data:{ok:true, fallback:true, value:'兜底数据'} };
+  if(id==='map' && scenarioKey==='retry') return val.data;
+  if(id==='comb') return { price:val.price, qty:val.qty, total:val.price*val.qty };
+  if(id==='map' && scenarioKey==='combine') return val.price*val.qty;
+  return val;
+}
+
+/* 判断一个包在节点处是否被丢弃/重试，返回 {action:'pass'|'drop'|'retry'|'error'} */
+function decide(node, val){
+  const id = node.id;
+  if(scenarioKey==='search'){
+    if(id==='dist') return { action:'pass' }; // 简化：不去重，改为全部放行看效果
+  }
+  if(scenarioKey==='retry'){
+    if(id==='retry' && val && val.err) return { action:'retry' };
+    if(id==='catch' && val && val.err) return { action:'drop' }; // 出错包到 catch 前被拦截演示
+    if(id==='map' && val && val.err) return { action:'error' };
+  }
+  if(scenarioKey==='combine'){
+    if(id==='filter'){
+      if(val && val.qty<=0) return { action:'drop' };
+    }
+  }
+  return { action:'pass' };
+}
+
+/* ---------- 动画主循环 ---------- */
+function frame(ts){
+  if(!lastTs) lastTs = ts;
+  const dt = Math.min(50, ts - lastTs);
+  lastTs = ts;
+
+  if(running) spawnPackets();
+
+  const distPerFrame = dt * (0.9 + speed*0.14);
+  // 移动数据包
+  for(const p of packets){
+    if(p.dead) continue;
+    if(p.held) continue; // 被节点延迟/合并持有中
+    p.progress += distPerFrame;
+    if(p.progress >= edgeLen(p.fromEdge)){
+      // 到达当前节点
+      const node = nodes[p.fromEdge+1];
+      if(!node) { p.dead=true; continue; }
+      if(node.id==='__sink'){ pushLog(node,'in',p.value); p.dead=true; continue; }
+      // 处理
+      const dec = decide(node, p.value);
+      if(dec.action==='drop'){
+        pushLog(node,'drop',p.value);
+        p.dead=true; p.droppedAt=node.id; p.dropAnim=1;
+        continue;
+      }
+      if(dec.action==='retry'){
+        // 回到本节点重试一次（模拟 retry）
+        pushLog(node,'drop',p.value);
+        const retried = {data:{ok:true, value:'重试成功'}};
+        p.value = retried; p.label = JSON.stringify(retried);
+        p.fromEdge = edges.findIndex(e=>e.from===node.id);
+        p.progress = 0;
+        continue;
+      }
+      // 变换 + 延迟 + 合并
+      let outVal = p.value;
+      if(node.kind==='transform' || node.kind==='combine'){
+        outVal = transformFor(node, p.value);
+        p.value = outVal; p.label = JSON.stringify(outVal);
+      }
+      pushLog(node,'in', p.value);
+      pushLog(node,'out', p.value);
+      // 进入下一条边
+      const nextEdge = p.fromEdge + 1;
+      if(node.kind==='delay' || node.kind==='merge'){
+        // 延迟节点：让包停留片刻再进入下一边
+        p.held = true; p.holdMs = node.delay || 200; p.nodeId=node.id;
+      } else if(edges[nextEdge]){
+        p.fromEdge = nextEdge;
+        p.progress = 0;
+      } else {
+        p.dead = true;
+      }
+    }
+  }
+  // 处理 held 包
+  for(const p of packets){
+    if(!p.dead && p.held){
+      p.holdMs -= dt;
+      if(p.holdMs<=0){
+        p.held=false;
+        const nextEdge = p.fromEdge + 1;
+        if(edges[nextEdge]){ p.fromEdge = nextEdge; p.progress=0; }
+        else p.dead=true;
+      }
+    }
+  }
+  // 清理
+  packets = packets.filter(p=>!p.dead && p.dropAnim!==1 && !p.holdFade);
+  // drop 动画单独管理
+  for(const p of packets) if(p.dropAnim && p.dropAnim>0) p.dropAnim -= dt/400;
+  packets = packets.filter(p=>!p.dead);
+
+  draw();
+  refreshInspector();
+  raf = requestAnimationFrame(frame);
+}
+
+function edgeLen(i){ return (nodes[i+1] ? nodes[i+1].x : 0) - nodes[i].x; }
+
+/* ---------- 绘制 ---------- */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // 背景网格
+  ctx.strokeStyle='rgba(38,45,59,.5)'; ctx.lineWidth=1;
+  const gs=28;
+  for(let x=gs*0.5;x<W;x+=gs){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  for(let y=gs*0.5;y<H;y+=gs){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+
+  if(!nodes.length) return;
+  drawEdges();
+  drawPackets();
+  drawNodes();
+}
+
+function nodeById(id){ return nodes.find(n=>n.id===id); }
+
+function drawEdges(){
+  for(let i=0;i<edges.length;i++){
+    const a = nodeById(edges[i].from);
+    const b = nodeById(edges[i].to);
+    if(!a||!b) continue;
+    const x1 = a.x + a.w, y1 = a.y + a.h/2;
+    const x2 = b.x, y2 = b.y + b.h/2;
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+    // 箭头
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    const ang = Math.atan2(y2-y1, x2-x1);
+    const ax = x2-4, ay=y2-4*Math.tan(ang*0.3);
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-8*Math.cos(ang-0.4), y2-8*Math.sin(ang-0.4));
+    ctx.lineTo(x2-8*Math.cos(ang+0.4), y2-8*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawPackets(){
+  for(const p of packets){
+    if(p.dead) continue;
+    const a = nodes[p.fromEdge];
+    const b = nodes[p.fromEdge+1];
+    if(!a||!b) continue;
+    const x1 = a.x + a.w, y1 = a.y + a.h/2;
+    const x2 = b.x, y2 = b.y + b.h/2;
+    const t = p.progress / edgeLen(p.fromEdge);
+    const cx = x1 + (x2-x1)*t;
+    const cy = y1 + (y2-y1)*t + Math.sin(p.id*7 + t*10)*5;
+    // 光晕
+    ctx.beginPath();
+    ctx.arc(cx,cy,10,0,Math.PI*2);
+    ctx.fillStyle='rgba(77,163,255,.16)';
+    ctx.fill();
+    // 包体
+    const boxW = Math.max(34, Math.min(92, 12+p.label.length*6.5));
+    const bw = boxW, bh = 20;
+    ctx.fillStyle='#10141b';
+    ctx.strokeStyle='#2c3effect';
+    ctx.strokeStyle='#2c3547';
+    ctx.lineWidth=1;
+    roundRect(cx-bw/2, cy-bh/2, bw, bh, 5);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#cfe4ff';
+    ctx.font='10px '+getComputedStyle(document.body).fontFamily.replace(/"/g,'');
+    ctx.font='10px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(shorten(p.label, 13), cx, cy+0.5);
+  }
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function shorten(s,n){ return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
+function drawNodes(){
+  const scale = window.__rxflowScale || 1;
+  const fsOp = Math.max(10, Math.round(12.5*scale*10)/10);
+  const fsLb = Math.max(8.5, Math.round(10*scale*10)/10);
+  for(const n of nodes){
+    const color = n.color;
+    const isSrc = n.kind==='source';
+    const isSink = n.kind==='sink';
+    // 节点体
+    ctx.fillStyle = isSink ? '#141821' : '#181d27';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    roundRect(n.x, n.y, n.w, n.h, 9);
+    ctx.fill(); ctx.stroke();
+    // 左侧小色条
+    const barW = Math.max(2, 3*scale);
+    ctx.fillStyle = color;
+    roundRect(n.x+1, n.y+8, barW, n.h-16, 2); ctx.fill();
+    // 可用文字宽
+    const padL = 14*scale + 4;
+    const textW = n.w - padL - 8;
+    // 名称
+    ctx.fillStyle = isSink ? '#8a94a6' : '#eef2f9';
+    ctx.font = '600 '+fsOp+'px sans-serif';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(fitText(n.op || n.label, textW, fsOp), n.x+padL, n.y+n.h*0.36);
+    // 副标签
+    ctx.fillStyle='#6b7486';
+    ctx.font=fsLb+'px sans-serif';
+    ctx.fillText(fitText(n.label, textW, fsLb), n.x+padL, n.y+n.h*0.72);
+    // 计数徽标
+    const c = nodeCounts[n.id];
+    if(c && (c.in||c.out||c.drop)){
+      drawBadge(n, c, scale);
+    }
+  }
+}
+function fitText(str, maxW, fontSize){
+  if(!str) return '';
+  ctx.font = '600 '+fontSize+'px sans-serif';
+  if(ctx.measureText(str).width <= maxW) return str;
+  let s = str;
+  while(s.length>1 && ctx.measureText(s+'…').width > maxW){ s = s.slice(0,-1); }
+  return s + '…';
+}
+
+function drawBadge(n, c, scale){
+  scale = scale || 1;
+  let items=[];
+  if(c.in) items.push([c.in,'#4da3ff']);
+  if(c.out) items.push([c.out,'#3dd68c']);
+  if(c.drop) items.push([c.drop,'#e8594f']);
+  const r = Math.max(6, 9.5*scale);
+  let bx = n.x + n.w - 8;
+  items.reverse();
+  for(const [v,col] of items){
+    const txt = String(v);
+    bx -= r*2;
+    ctx.fillStyle=col; ctx.beginPath();
+    ctx.arc(bx+r, n.y+n.h/2, r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#081018';
+    ctx.font='bold '+Math.max(8,Math.round(9.5*scale))+'px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(txt, bx+r, n.y+n.h/2+0.5);
+    bx -= 4;
+  }
+}
+
+/* ---------- 交互：点击节点 ---------- */
+function hitTest(x,y){
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i];
+    if(x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h) return n;
+  }
+  return null;
+}
+let selectedNode = null;
+canvas.addEventListener('click', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX-rect.left), y=(e.clientY-rect.top);
+  const n = hitTest(x,y);
+  if(n) selectNode(n);
+});
+
+function selectNode(n){
+  selectedNode = n;
+  $('inspector').style.display='flex';
+  $('insEmpty').style.display='none';
+  $('insContent').style.display='flex';
+  const op = n.op || n.label;
+  $('insTitle').textContent = n.kind==='source' ? '数据源' : (n.kind==='sink' ? '订阅终点' : '操作符节点');
+  $('insOp').textContent = op;
+  $('insDot').style.background = n.color;
+  renderInspector();
+}
+$('insClose').addEventListener('click', ()=>{
+  $('insContent').style.display='none';
+  $('insEmpty').style.display='block';
+  selectedNode=null;
+});
+
+function renderInspector(){
+  if(!selectedNode) return;
+  const n = selectedNode;
+  const c = nodeCounts[n.id];
+  const log = nodeLogs[n.id];
+  const body = $('insContent');
+  body.innerHTML = '';
+  // KPI
+  const kpi = document.createElement('div');
+  kpi.className='kpi';
+  kpi.innerHTML =
+    `<div class="cell"><div class="k">收到 IN</div><div class="v good">${c.in||0}</div></div>`+
+    `<div class="cell"><div class="k">放行 OUT</div><div class="v good">${c.out||0}</div></div>`+
+    `<div class="cell"><div class="k">丢弃 DROP</div><div class="v ${c.drop>0?'bad':'good'}">${c.drop||0}</div></div>`;
+  body.appendChild(kpi);
+  // 说明
+  const desc = document.createElement('div');
+  desc.className='desc';
+  desc.innerHTML = `<code>${n.op||''}</code> — ${n.label}`;
+  body.appendChild(desc);
+  // 输入流
+  body.appendChild(secTitle('收到 IN'));
+  body.appendChild(stream(log.in, 'in'));
+  // 输出流
+  body.appendChild(secTitle('放行 OUT'));
+  body.appendChild(stream(log.out, 'out'));
+  // 丢弃
+  if(log.drop.length){
+    body.appendChild(secTitle('丢弃 DROP'));
+    body.appendChild(stream(log.drop, 'drop'));
+  }
+}
+function secTitle(t){
+  const d=document.createElement('div'); d.className='sec-t'; d.textContent=t; return d;
+}
+function stream(arr, kind){
+  const wrap=document.createElement('div'); wrap.className='stream';
+  if(!arr.length){
+    const r=document.createElement('div'); r.className='row';
+    r.innerHTML=`<span class="t">—</span><span class="dir" style="color:#5b6475">尚未收到值</span>`;
+    wrap.appendChild(r); return wrap;
+  }
+  const slice = arr.slice(-12).reverse();
+  for(const e of slice){
+    const r=document.createElement('div'); r.className='row';
+    const time = new Date(e.ts).toLocaleTimeString('zh-CN',{hour12:false});
+    r.innerHTML = `<span class="t">${time}</span><span class="marker ${kind==='drop'?'dropped':kind}"></span><span class="p ${kind==='drop'?'dropped':kind==='out'?'out':''}">${e.v}</span>`;
+    wrap.appendChild(r);
+  }
+  return wrap;
+}
+
+/* 检查器联动刷新（低频，避免每帧重建） */
+let insTimer=0;
+function refreshInspector(){
+  if(!selectedNode) return;
+  insTimer++;
+  if(insTimer%12===0) renderInspector();
+}
+
+/* ---------- 控件 ---------- */
+function buildScenarioSeg(){
+  const seg=$('scenarioSeg');
+  seg.innerHTML='';
+  Object.keys(SCENARIOS).forEach(k=>{
+    const b=document.createElement('button');
+    b.textContent=SCENARIOS[k].name;
+    b.className = k===scenarioKey?'on':'';
+    b.onclick=()=>{ scenarioKey=k; reset(); buildScenarioSeg(); };
+    seg.appendChild(b);
+  });
+}
+
+function reset(){
+  running=false;
+  $('btnRun').textContent='▶ 运行';
+  $('liveTag').textContent='● 已暂停';
+  $('liveTag').classList.remove('live');
+  buildGraph();
+  layout();
+  if(selectedNode) selectNode(selectedNode);
+}
+
+$('btnRun').addEventListener('click', ()=>{
+  running=!running;
+  $('btnRun').textContent = running?'⏸ 暂停':'▶ 运行';
+  $('liveTag').textContent = running?'● 运行中':'● 已暂停';
+  $('liveTag').classList.toggle('live', running);
+});
+$('btnStep').addEventListener('click', ()=>{
+  if(!running) stepQueue.push(1);
+  else { running=false; $('btnRun').textContent='▶ 运行'; $('liveTag').textContent='● 已暂停'; $('liveTag').classList.remove('live'); stepQueue.push(1); }
+});
+$('btnReset').addEventListener('click', reset);
+$('speed').addEventListener('input', e=>{ speed = +e.target.value; });
+
+/* ---------- 启动 ---------- */
+buildScenarioSeg();
+buildGraph();
+resize();
+raf = requestAnimationFrame(frame);
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
